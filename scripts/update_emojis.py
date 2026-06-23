@@ -3,7 +3,6 @@
 
 import json
 import os
-import sys
 from datetime import date
 
 import requests
@@ -66,8 +65,7 @@ def _category_anchor(name: str) -> str:
     return "#" + name.lower().replace(" ", "-")
 
 
-def build_markdown(emojis: dict[str, str], categories_config: dict, changelog: list) -> str:
-    today = date.today().isoformat()
+def build_markdown(emojis: dict[str, str], categories_config: dict, changelog: list, last_updated: str, last_checked: str) -> str:
     total = len(emojis)
 
     grouped: dict[str, list[str]] = {}
@@ -82,7 +80,7 @@ def build_markdown(emojis: dict[str, str], categories_config: dict, changelog: l
     lines = [
         "# GitHub Emojis",
         "",
-        f"> Last updated: {today} | Total: {total} emojis",
+        f"> Last updated: {last_updated} | Last checked: {last_checked} | Total: {total} emojis",
         "",
         "To recategorize an emoji, [create a PR](https://github.com/brentspine/auto-update-gists) on the repository.",
         "",
@@ -143,12 +141,15 @@ def main() -> None:
     added = sorted(current_names - previous_names)
     removed = sorted(previous_names - current_names)
 
-    if not is_first_run and not added and not removed:
-        print("No emoji changes detected. Skipping update.")
-        sys.exit(0)
+    today = date.today().isoformat()
+    last_checked = today
 
-    if is_first_run:
+    if not is_first_run and not added and not removed:
+        print("No emoji changes detected. Updating gist with latest check date.")
+        last_updated = state.get("last_updated", today)
+    elif is_first_run:
         print(f"First run — initializing gist with {len(current_names)} emojis.")
+        last_updated = today
     else:
         print(f"Changes detected: +{len(added)} added, -{len(removed)} removed.")
         if added:
@@ -156,20 +157,22 @@ def main() -> None:
         if removed:
             print(f"  Removed: {', '.join(removed[:10])}{'…' if len(removed) > 10 else ''}")
 
-        entry: dict = {"date": date.today().isoformat()}
+        entry: dict = {"date": today}
         if added:
             entry["added"] = added
         if removed:
             entry["removed"] = removed
         changelog.append(entry)
+        last_updated = today
 
     new_state = {
         "emojis": sorted(current_names),
         "changelog": changelog,
-        "last_updated": date.today().isoformat(),
+        "last_updated": last_updated,
+        "last_checked": last_checked,
     }
 
-    md_content = build_markdown(current_emojis, categories_config, changelog)
+    md_content = build_markdown(current_emojis, categories_config, changelog, last_updated, last_checked)
     url = update_gist(md_content)
     save_state(new_state)
     print(f"Gist updated: {url}")
