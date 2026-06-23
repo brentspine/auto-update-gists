@@ -1,0 +1,29 @@
+name: Update Emoji Gist
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # daily at 00:00 UTC
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Update emoji gist
+        run: python scripts/update_emojis.py
+        env:
+          GITHUB_TOKEN: ${{ secrets.GIST_TOKEN }}
+          GIST_ID: ${{ secrets.GIST_ID }}
