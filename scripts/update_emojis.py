@@ -84,6 +84,8 @@ def build_markdown(emojis: dict[str, str], categories_config: dict, changelog: l
         "",
         f"> Last updated: {today} | Total: {total} emojis",
         "",
+        "To recategorize an emoji, [create a PR](https://github.com/brentspine/auto-update-gists) on the repository.",
+        "",
     ]
 
     lines += ["## Categories", ""]
