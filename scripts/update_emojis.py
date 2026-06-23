@@ -62,6 +62,10 @@ def build_emoji_table(names: list[str]) -> list[str]:
     return lines
 
 
+def _category_anchor(name: str) -> str:
+    return "#" + name.lower().replace(" ", "-")
+
+
 def build_markdown(emojis: dict[str, str], categories_config: dict, changelog: list) -> str:
     today = date.today().isoformat()
     total = len(emojis)
@@ -71,6 +75,10 @@ def build_markdown(emojis: dict[str, str], categories_config: dict, changelog: l
         cat = get_category(name, categories_config)
         grouped.setdefault(cat, []).append(name)
 
+    order: list[str] = categories_config.get("category_order", [])
+    ordered_keys = [c for c in order if c in grouped]
+    ordered_keys += sorted(c for c in grouped if c not in order)
+
     lines = [
         "# GitHub Emojis",
         "",
@@ -78,9 +86,14 @@ def build_markdown(emojis: dict[str, str], categories_config: dict, changelog: l
         "",
     ]
 
-    for category, names in sorted(grouped.items()):
+    lines += ["## Categories", ""]
+    for category in ordered_keys:
+        lines.append(f"- [{category}]({_category_anchor(category)})")
+    lines.append("")
+
+    for category in ordered_keys:
         lines += [f"## {category}", ""]
-        lines += build_emoji_table(names)
+        lines += build_emoji_table(grouped[category])
         lines.append("")
 
     lines += ["---", "", "## Changelog", ""]
