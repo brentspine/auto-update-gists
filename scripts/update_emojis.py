@@ -12,7 +12,7 @@ GITHUB_TOKEN = os.environ["GITHUB_TOKEN"]
 GIST_ID = os.environ["GIST_ID"]
 
 EMOJIS_MD_FILE = "emojis.md"
-STATE_FILE = "emojis-state.json"
+EMOJIS_PER_ROW = 3
 
 HEADERS = {
     "Authorization": f"Bearer {GITHUB_TOKEN}",
@@ -20,7 +20,9 @@ HEADERS = {
     "X-GitHub-Api-Version": "2022-11-28",
 }
 
-CATEGORIES_FILE = os.path.join(os.path.dirname(__file__), "..", "emoji_categories.json")
+ROOT = os.path.join(os.path.dirname(__file__), "..")
+CATEGORIES_FILE = os.path.join(ROOT, "emoji_categories.json")
+STATE_FILE = os.path.join(ROOT, "emoji_state.json")
 
 
 def get_category(name: str, categories: dict) -> str:
@@ -33,21 +35,31 @@ def fetch_emojis() -> dict[str, str]:
     return resp.json()
 
 
-def fetch_gist() -> dict:
-    resp = requests.get(f"https://api.github.com/gists/{GIST_ID}", headers=HEADERS, timeout=30)
-    resp.raise_for_status()
-    return resp.json()
-
-
-def parse_state(gist_data: dict) -> dict:
-    files = gist_data.get("files", {})
-    if STATE_FILE in files:
-        raw = files[STATE_FILE].get("content", "")
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError:
-            pass
+def load_state() -> dict:
+    if os.path.exists(STATE_FILE):
+        with open(STATE_FILE) as f:
+            try:
+                return json.load(f)
+            except json.JSONDecodeError:
+                pass
     return {"emojis": [], "changelog": []}
+
+
+def save_state(state: dict) -> None:
+    with open(STATE_FILE, "w") as f:
+        json.dump(state, f, indent=2)
+        f.write("\n")
+
+
+def build_emoji_table(names: list[str]) -> list[str]:
+    lines = ["|" + "|".join([" "] * EMOJIS_PER_ROW) + "|",
+             "|" + "|".join(["---"] * EMOJIS_PER_ROW) + "|"]
+    for i in range(0, len(names), EMOJIS_PER_ROW):
+        chunk = names[i:i + EMOJIS_PER_ROW]
+        cells = [f" :{name}: `{name}` " for name in chunk]
+        cells += [" "] * (EMOJIS_PER_ROW - len(cells))
+        lines.append("|" + "|".join(cells) + "|")
+    return lines
 
 
 def build_markdown(emojis: dict[str, str], categories_config: dict, changelog: list) -> str:
@@ -67,26 +79,14 @@ def build_markdown(emojis: dict[str, str], categories_config: dict, changelog: l
     ]
 
     for category, names in sorted(grouped.items()):
-        lines += [
-            f"## {category}",
-            "",
-            "| Preview | Name |",
-            "|---------|------|",
-        ]
-        for name in names:
-            lines.append(f"| :{name}: | `{name}` |")
+        lines += [f"## {category}", ""]
+        lines += build_emoji_table(names)
         lines.append("")
 
-    lines += [
-        "---",
-        "",
-        "## Changelog",
-        "",
-    ]
+    lines += ["---", "", "## Changelog", ""]
 
     if not changelog:
-        lines.append("_No changes recorded yet._")
-        lines.append("")
+        lines += ["_No changes recorded yet._", ""]
     else:
         for entry in reversed(changelog):
             lines.append(f"### {entry['date']}")
@@ -101,13 +101,8 @@ def build_markdown(emojis: dict[str, str], categories_config: dict, changelog: l
     return "\n".join(lines)
 
 
-def update_gist(md_content: str, state: dict) -> str:
-    payload = {
-        "files": {
-            EMOJIS_MD_FILE: {"content": md_content},
-            STATE_FILE: {"content": json.dumps(state, indent=2)},
-        }
-    }
+def update_gist(md_content: str) -> str:
+    payload = {"files": {EMOJIS_MD_FILE: {"content": md_content}}}
     resp = requests.patch(
         f"https://api.github.com/gists/{GIST_ID}",
         headers=HEADERS,
@@ -125,14 +120,11 @@ def main() -> None:
     current_emojis = fetch_emojis()
     current_names = set(current_emojis.keys())
 
-    gist_data = fetch_gist()
-    state = parse_state(gist_data)
-
+    state = load_state()
     previous_names = set(state.get("emojis", []))
     changelog = state.get("changelog", [])
 
     is_first_run = not previous_names
-
     added = sorted(current_names - previous_names)
     removed = sorted(previous_names - current_names)
 
@@ -145,11 +137,9 @@ def main() -> None:
     else:
         print(f"Changes detected: +{len(added)} added, -{len(removed)} removed.")
         if added:
-            preview = ", ".join(added[:10]) + ("…" if len(added) > 10 else "")
-            print(f"  Added: {preview}")
+            print(f"  Added: {', '.join(added[:10])}{'…' if len(added) > 10 else ''}")
         if removed:
-            preview = ", ".join(removed[:10]) + ("…" if len(removed) > 10 else "")
-            print(f"  Removed: {preview}")
+            print(f"  Removed: {', '.join(removed[:10])}{'…' if len(removed) > 10 else ''}")
 
         entry: dict = {"date": date.today().isoformat()}
         if added:
@@ -165,7 +155,8 @@ def main() -> None:
     }
 
     md_content = build_markdown(current_emojis, categories_config, changelog)
-    url = update_gist(md_content, new_state)
+    url = update_gist(md_content)
+    save_state(new_state)
     print(f"Gist updated: {url}")
 
 
