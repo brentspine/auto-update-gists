@@ -70,7 +70,7 @@ def build_emoji_table(names: list[str], emojis: dict[str, str]) -> list[str]:
         chunk = names[i:i + EMOJIS_PER_ROW]
         cells = [
             f' :{name}: <img src="{emojis[name]}" width="{EMOJI_IMG_SIZE}" '
-            f'height="{EMOJI_IMG_SIZE}" alt="{name}" style="vertical-align: middle"> `{name}` '
+            f'height="{EMOJI_IMG_SIZE}" alt="{name}" align="center"> `{name}` '
             for name in chunk
         ]
         cells += [" "] * (EMOJIS_PER_ROW - len(cells))
