@@ -70,7 +70,7 @@ def build_emoji_table(names: list[str], emojis: dict[str, str]) -> list[str]:
         chunk = names[i:i + EMOJIS_PER_ROW]
         cells = [
             f' :{name}: <img src="{emojis[name]}" width="{EMOJI_IMG_SIZE}" '
-            f'height="{EMOJI_IMG_SIZE}" alt="{name}"> `{name}` '
+            f'height="{EMOJI_IMG_SIZE}" alt="{name}" align="middle"> `{name}` '
             for name in chunk
         ]
         cells += [" "] * (EMOJIS_PER_ROW - len(cells))
@@ -106,6 +106,8 @@ def build_markdown(emojis: dict[str, str], categories_config: dict, changelog: l
         "# GitHub Emojis",
         "",
         f"> Last updated: {last_updated} | Last checked: {last_checked} | Total: {total} emojis",
+        "",
+        "Each entry includes the `:name:` shortcode, as your browser renders it, followed by GitHub's own provided image for comparison.",
         "",
         "To recategorize an emoji, [create a PR](https://github.com/brentspine/auto-update-gists) on the repository.",
         "",
